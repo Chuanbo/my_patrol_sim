@@ -12,6 +12,6 @@ To run the simulation <br />
   3 run 'roslaunch my_patrol_sim patrol_multi_robot.launch' in a new terminal; <br />
   4 start the Python script 'my_monitor.py' (in 'scripts/my_monitor' folder) to control the simulation.
 
-To configure parameters, use the scripy 'initialize_sim.py'.
+To configure parameters, use the script 'initialize_sim.py'.
 
 The results are stored in 'scripts/my_monitor/results' folder.
