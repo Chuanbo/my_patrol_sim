@@ -3,7 +3,7 @@ Multi-robot patrol simulation
 
 Required </br>
   ROS Hydro and package: [stage_ros](http://wiki.ros.org/stage_ros) <br />
-  LCM(Lightweight Communications and Marshalling) [v1.0.0](https://github.com/lcm-proj/lcm) <br />
+  [LCM v1.0.0](https://github.com/lcm-proj/lcm) (Lightweight Communications and Marshalling) <br />
   Python 2.7 and packages: [Scanf](https://hkn.eecs.berkeley.edu/~dyoo/python/scanf/), [PIL(Python Imaging Library)](http://pythonware.com/products/pil/)
 
 To run the simulation <br />
@@ -15,3 +15,5 @@ To run the simulation <br />
 To configure parameters, use the script 'initialize_sim.py'.
 
 The results are stored in 'scripts/my_monitor/results' folder.
+
+Detailed information can be found in the file "documentation.pdf".
