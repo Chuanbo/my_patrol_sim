@@ -39,7 +39,7 @@ public:
         com_rate_ = 100;
         
         // 机器人间通讯范围的限制 
-        com_dist_ = 12;
+        com_dist_ = 1200;
         // com_dist_=12  FOR  2 hops in map grid 
     }
     
