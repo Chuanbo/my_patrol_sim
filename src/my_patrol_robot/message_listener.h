@@ -22,6 +22,21 @@
 #include "exlcm/status_t.hpp"
 
 
+typedef struct {
+    int vertex_id;
+    double visit_time;
+    double update_time;
+} idleness_pub;
+
+typedef struct {
+    int robot_id;
+    int vertex_id;
+    double decision_time;
+    double estimate_time;
+    double update_time;
+} intention_pub;
+
+
 // 消息处理线程函数  函数声明 
 void message_thread();
 
@@ -35,12 +50,17 @@ public:
         robot_frame_ = tf::resolve(g_tf_prefix, "base_footprint");
         
         srand ( time(NULL) );
-        // 通讯可靠性的百分比，完全可靠时 com_rate_ = 100 
+        // percentage of communication reliability (0~100), com_rate_=100 means 100% reliable  通讯可靠性的百分比，完全可靠时 com_rate_ = 100 
         com_rate_ = 100;
         
-        // 机器人间通讯范围的限制 
+        // communication between robots within com_dist_ meters  机器人间通讯范围的限制 
         com_dist_ = 1200;
         // com_dist_=12  FOR  2 hops in map grid 
+        
+        // delay com_delay_=0,5,10,15 seconds in communication 
+        com_delay_ = 0;
+        idleness_pub_list.clear();
+        intention_pub_list.clear();
     }
     
     ~Handler() {}
@@ -54,6 +74,11 @@ public:
     int com_dist_;  // 机器人间通讯范围的限制 
     std::set<int> robot_set_;  // 存储在此机器人周围的其它机器人的编号 
 
+    // delay in communication 
+    int com_delay_;
+    std::vector<idleness_pub> idleness_pub_list;
+    std::vector<intention_pub> intention_pub_list;
+    
 
     void handleMessageCommand(const lcm::ReceiveBuffer* rbuf,
             const std::string& chan, 

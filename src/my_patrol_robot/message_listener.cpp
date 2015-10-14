@@ -89,6 +89,22 @@ void Handler::handleMessageIdleness(const lcm::ReceiveBuffer* rbuf,
     int vertex_id = idleness_msg->vertex_id;
     double visit_time = idleness_msg->visit_time;
     
+    
+    // 建模通讯的时间延迟 
+    // 通讯时延大于1秒时才予以考虑 
+    if( com_delay_ > 1 )
+    {
+        idleness_pub one_idleness_pub;
+        one_idleness_pub.vertex_id = vertex_id;
+        one_idleness_pub.visit_time = visit_time;
+        one_idleness_pub.update_time = visit_time + com_delay_;
+        
+        idleness_pub_list.push_back(one_idleness_pub);
+        // 返回 
+        return;
+    }
+    
+    
     // 更新地图中节点的空闲率信息 
     {
         boost::mutex::scoped_lock idleness_lock(g_idleness_mutex);
@@ -130,6 +146,24 @@ void Handler::handleMessageIntention(const lcm::ReceiveBuffer* rbuf,
     int vertex_id = intention_msg->vertex_id;
     double decision_time = intention_msg->decision_time;
     double estimate_time = intention_msg->estimate_time;
+    
+    
+    // 建模通讯的时间延迟 
+    // 通讯时延大于1秒时才予以考虑 
+    if( com_delay_ > 1 )
+    {
+        intention_pub one_intention_pub;
+        one_intention_pub.robot_id = robot_id;
+        one_intention_pub.vertex_id = vertex_id;
+        one_intention_pub.decision_time = decision_time;
+        one_intention_pub.estimate_time = estimate_time;
+        one_intention_pub.update_time = decision_time + com_delay_;
+        
+        intention_pub_list.push_back(one_intention_pub);
+        // 返回 
+        return;
+    }
+    
     
     // 更新其他机器人要到达的下一个目标点信息 
     {
@@ -192,7 +226,73 @@ void Handler::handleMessageState(const lcm::ReceiveBuffer* rbuf,
             const std::string& chan, 
             const exlcm::status_t* status_msg)
 {
-    if( status_msg->robot_id == robot_id_ )  return;
+    // 检查是否有消息等待发布 
+    if( status_msg->robot_id == robot_id_ )
+    {
+        if( idleness_pub_list.empty() && intention_pub_list.empty() )  return;
+        
+        lcm::LCM lcm;
+        if(!lcm.good())
+            exit(0);
+        
+        double current_time = ros::Time::now().toSec();
+        
+        while( !idleness_pub_list.empty() )
+        {
+            idleness_pub one_idleness_pub;
+            one_idleness_pub = idleness_pub_list[0];
+            
+            if( one_idleness_pub.update_time > (current_time + 1) )  break;
+                        
+            // 更新地图中节点的空闲率信息 
+            {
+                boost::mutex::scoped_lock idleness_lock(g_idleness_mutex);
+                if( one_idleness_pub.visit_time > g_last_visit[one_idleness_pub.vertex_id] )
+                {
+                    g_last_visit[one_idleness_pub.vertex_id] = one_idleness_pub.visit_time;
+                }
+            }
+            
+            idleness_pub_list.erase(idleness_pub_list.begin());  // 删除已更新的消息 
+  /*
+            // 当此机器人是 robot_0 时，输出消息延迟信息，用于调试需要 
+            if ( robot_id_ == 0 )
+            {
+                std::cout << "visit_time: " << one_idleness_pub.visit_time << std::endl;
+                std::cout << "delay_time: " << current_time << std::endl;
+            }
+  */
+        }
+        
+        while( !intention_pub_list.empty() )
+        {
+            intention_pub one_intention_pub;
+            one_intention_pub = intention_pub_list[0];
+            
+            if( one_intention_pub.update_time > (current_time + 1) )  break;
+            
+            // 更新其他机器人要到达的下一个目标点信息 
+            {
+                boost::mutex::scoped_lock intention_lock(g_intention_mutex);
+                g_intention_mate[one_intention_pub.robot_id] = one_intention_pub.vertex_id;
+                g_intention_decision_time[one_intention_pub.robot_id] = one_intention_pub.decision_time;
+                g_intention_estimate_time[one_intention_pub.robot_id] = one_intention_pub.estimate_time;
+            }
+            
+            intention_pub_list.erase(intention_pub_list.begin());  // 删除已更新的消息 
+  /*
+            // 当此机器人是 robot_0 时，输出消息延迟信息，用于调试需要 
+            if ( robot_id_ == 0 )
+            {
+                std::cout << "decision_time: " << one_intention_pub.decision_time << std::endl;
+                std::cout << "delay_time: " << current_time << std::endl;
+            }
+  */
+        }
+    
+        // 返回 
+        return;
+    }
     
     // 机器人当前的位姿 
     double x_robot, y_robot, th_robot;

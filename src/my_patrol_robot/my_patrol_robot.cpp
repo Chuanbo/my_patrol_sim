@@ -37,7 +37,7 @@ public:
             std::cout << "g_vel_robot = " << g_vel_robot << std::endl;
         }
         
-        listener.waitForTransform("/map", robot_frame_, ros::Time(0), ros::Duration(10.0));
+        listener_.waitForTransform("/map", robot_frame_, ros::Time(0), ros::Duration(10.0));
     }
     
     ~MyRobot() 
@@ -53,7 +53,7 @@ public:
     
     std::string robot_frame_;
     
-    tf::TransformListener listener;
+    tf::TransformListener listener_;
 };
 
 
@@ -63,7 +63,7 @@ void MyRobot::timerStatusPublish_callback(const ros::TimerEvent& event)
     // 通过tf获取机器人当前的位姿 
     tf::StampedTransform transform;
     try {
-        listener.lookupTransform("/map", robot_frame_, ros::Time(0), transform);
+        listener_.lookupTransform("/map", robot_frame_, ros::Time(0), transform);
     }
     catch (tf::TransformException &ex) {
         ROS_ERROR("%s",ex.what());
