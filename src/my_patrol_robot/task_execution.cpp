@@ -172,6 +172,28 @@ void TaskExecution::goalDoneCallback(const actionlib::SimpleClientGoalState &sta
             th_robot = g_th_robot;
         }
         
+        // random move in order to avoid stuck 
+        // 取消正在执行的任务 
+        ac->cancelAllGoals();
+        
+        // Define Goal 
+        move_base_msgs::MoveBaseGoal goal;
+        goal.target_pose.header.frame_id = tf::resolve(g_tf_prefix, "base_link");
+        goal.target_pose.header.stamp = ros::Time::now();
+        // random move 
+        double th_rand = ( rand() % 314 ) / 100.0;
+        goal.target_pose.pose.position.x = cos(th_rand);
+        goal.target_pose.pose.position.y = sin(th_rand);
+        goal.target_pose.pose.orientation.w = 1.0;
+        
+        ac->sendGoal(goal);
+        
+        // Wait for the action to return
+        ac->waitForResult(ros::Duration(5));
+        
+        std::cout << "robot " << robot_id_ << " random move" << std::endl;
+        
+        // 重新选择目标节点 
         // 确定机器人当前所在的节点（距离机器人当前位置最近的节点） 
         current_vertex = identify_vertex(x_robot, y_robot);
         
@@ -188,7 +210,8 @@ void TaskExecution::goalDoneCallback(const actionlib::SimpleClientGoalState &sta
         }
         
         // 决策发布下一个任务 
-        next_vertex = decide_next_vertex(x_robot, y_robot);
+//        next_vertex = decide_next_vertex(x_robot, y_robot);
+        next_vertex = random(current_vertex, vertex_web);
         
         // 发布 intention 更新消息 
         publish_intention(next_vertex, ros::Time::now().toSec(), x_robot, y_robot);
@@ -202,6 +225,16 @@ void TaskExecution::goalDoneCallback(const actionlib::SimpleClientGoalState &sta
 void TaskExecution::goalActiveCallback()
 {
 //  printf("%s: goal active callback \n", move_base_str_.c_str());
+
+    // check whether the robot is stuck or not every 20 seconds 
+    // initialization 
+    check_time = ros::Time::now().toSec() + 20;
+    // record the position of this robot 
+    {
+        boost::mutex::scoped_lock status_lock(g_status_mutex);
+        check_x_robot = g_x_robot;
+        check_y_robot = g_y_robot;
+    }
 }
 
 
@@ -209,6 +242,83 @@ void TaskExecution::goalActiveCallback()
 void TaskExecution::goalFeedbackCallback(const move_base_msgs::MoveBaseFeedbackConstPtr &feedback)
 {
 //  printf("%s: goal feedback callback \n", move_base_str_.c_str());
+
+    // check whether the robot is stuck or not every 20 seconds 
+    if( ros::Time::now().toSec() > check_time )
+    {
+        // get the position of this robot 
+        double x_robot, y_robot, th_robot;
+        {
+            boost::mutex::scoped_lock status_lock(g_status_mutex);
+            x_robot = g_x_robot;
+            y_robot = g_y_robot;
+            th_robot = g_th_robot;
+        }
+        
+        // if the robot moves less than 1 meter in 20 seconds, it may be stuck in place. 
+        double distance_move = sqrt(pow((check_x_robot - x_robot), 2) + pow((check_y_robot - y_robot), 2));
+        if( distance_move < 1 )
+        {
+            // try to move from stuck 
+            std::cout << "check robot " << robot_id_ << " is stuck at time " << check_time << std::endl;
+            
+            // 取消正在执行的任务 
+            ac->cancelAllGoals();
+            
+            // Define Goal 
+            move_base_msgs::MoveBaseGoal goal;
+            goal.target_pose.header.frame_id = tf::resolve(g_tf_prefix, "base_link");
+            goal.target_pose.header.stamp = ros::Time::now();
+            // random move 
+            double th_rand = ( rand() % 314 ) / 100.0;
+            goal.target_pose.pose.position.x = cos(th_rand);
+            goal.target_pose.pose.position.y = sin(th_rand);
+            goal.target_pose.pose.orientation.w = 1.0;
+            
+            ac->sendGoal(goal);
+            
+            // Wait for the action to return
+            ac->waitForResult(ros::Duration(5));
+            
+            std::cout << "robot " << robot_id_ << " random move" << std::endl;
+            
+            // 重新选择目标节点 
+            // 确定机器人当前所在的节点（距离机器人当前位置最近的节点） 
+            current_vertex = identify_vertex(x_robot, y_robot);
+            
+            double current_time = ros::Time::now().toSec();
+            
+            // 更新地图中各节点的空闲率信息，由于未到达目标点，因此不更新全局变量 g_last_visit，仅更新类的成员变量 last_visit,instantaneous_idleness 
+            {
+                boost::mutex::scoped_lock idleness_lock(g_idleness_mutex);
+                for(int i=0; i<dimension; ++i)
+                {
+                    last_visit[i] = g_last_visit[i];
+                    instantaneous_idleness[i] = current_time - last_visit[i];
+                }
+            }
+            
+            // 决策发布下一个任务 
+//            next_vertex = decide_next_vertex(x_robot, y_robot);
+            next_vertex = random(current_vertex, vertex_web);
+            
+            // 发布 intention 更新消息 
+            publish_intention(next_vertex, ros::Time::now().toSec(), x_robot, y_robot);
+            
+            send_goal(next_vertex, x_robot, y_robot);
+            
+            // 返回 
+            return;
+        }
+        
+        // begin new record 
+        check_time = ros::Time::now().toSec() + 20;
+        {
+            boost::mutex::scoped_lock status_lock(g_status_mutex);
+            check_x_robot = g_x_robot;
+            check_y_robot = g_y_robot;
+        }
+    }
 }
 
 
@@ -404,6 +514,7 @@ unsigned int TaskExecution::decide_next_vertex(double x_robot, double y_robot)
 
 
   /*
+// centralized partion-based algorithm 
 // 分区巡逻算法，按部就班地一步步执行，不会中途调整巡逻计划 
     ++plan_vertex_i;
     if( plan_vertex_i == plan_vertex_num )  plan_vertex_i = 0;

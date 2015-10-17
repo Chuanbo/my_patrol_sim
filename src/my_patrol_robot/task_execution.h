@@ -122,6 +122,11 @@ public:
         }
         
         goal_reached_wait = 1.0;  // 到达巡逻节点后的等待时间，表示在此处执行检测操作所需的时间 
+        
+        // check whether the robot is stuck or not every 20 seconds 
+        check_time = 0;
+        check_x_robot = 0;
+        check_y_robot = 0;
     }
     
     ~TaskExecution()
@@ -185,6 +190,11 @@ private:
     unsigned int * path;
     unsigned int elem_s_path;
     unsigned int i_path;
+    
+    // check whether the robot is stuck or not every 20 seconds 
+    double check_time;
+    double check_x_robot;
+    double check_y_robot;
     
 };
 
