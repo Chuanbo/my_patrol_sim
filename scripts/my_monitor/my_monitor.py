@@ -21,8 +21,6 @@ import time
 # 目前仅用到rospy的time 
 import rospy
 
-import scanf
-
 import math
 
 
@@ -60,6 +58,15 @@ height_px = 1
 resolution = 0.05
 
 
+def readvalue_line(graph_file):
+    # 读取文件中的数值(返回值为字符串)，每行只有一个数值 
+    line = graph_file.readline()
+    line = line.rstrip()  # remove end-of-line
+    if len(line) == 0:
+        return readvalue_line(graph_file)  # 递归调用,跳过空行 
+    return line
+
+
 # lcm消息处理线程的类的定义 
 class myThread(threading.Thread):
 
@@ -76,15 +83,14 @@ class myThread(threading.Thread):
         
         # 读取.graph文件，初始化地图中节点的数目dimension 
         graph_file = open( mapGraph_filename, 'r' )
-        read_tuple = scanf.fscanf(graph_file, "%d %d %d %f")
         global dimension
         global width_px
         global height_px
         global resolution
-        dimension = read_tuple[0]
-        width_px = read_tuple[1]
-        height_px = read_tuple[2]
-        resolution = read_tuple[3]
+        dimension = int(readvalue_line(graph_file))
+        width_px = int(readvalue_line(graph_file))
+        height_px = int(readvalue_line(graph_file))
+        resolution = float(readvalue_line(graph_file))
         graph_file.close()
         # 目前，对graph文件后面的各节点信息并未加以利用 
         
